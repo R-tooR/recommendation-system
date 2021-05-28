@@ -13,4 +13,13 @@ libraryDependencies += "org.apache.spark" % "spark-core_2.12" % "3.0.0"
 libraryDependencies += "org.apache.spark" % "spark-sql_2.12" % "3.0.0"
 libraryDependencies += "org.apache.spark" % "spark-mllib_2.12" % "3.0.0"
 
-libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.13.4" % Test
+//libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.13.4" % Test
+libraryDependencies += "org.scalactic" %% "scalactic" % "3.2.7"
+libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.7" % "test"
+//libraryDependencies += "com.fasterxml.jackson.module" % "jackson-module-scala" % "2.0.2"
+
+// do data-provider
+libraryDependencies += "org.neo4j.driver" % "neo4j-java-driver" % "1.0.4"
+
+//log
+libraryDependencies += "org.apache.logging.log4j" %% "log4j-api-scala" % "11.0"

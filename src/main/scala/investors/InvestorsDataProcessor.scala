@@ -22,7 +22,10 @@ class InvestorsDataProcessor {
     val targetAttributes = List(targetCompaniesMap.size(), targetCompaniesMap.size())
     val normalizedTargetAttributes = targetAttributes map(v => v/coll2Norm(targetAttributes))
 
-    val reduceTuple = (x: (Row, Row)) => x._1.getLong(0) + x._2.getLong(0) // rozszerzyć do wielu parametrów (dodatkowe*)
+    val reduceTuple = (x: (Row, Row)) => {
+      print("reduceTuple: x._1: " + x._1 + " x._2: " + x._2)
+      x._1.getLong(0) + x._2.getLong(0)
+    } // rozszerzyć do wielu parametrów (dodatkowe*)
     val tuple2Norm = (v: (Long, Long)) => Math.sqrt(v._1*v._1 + v._2*v._2)
 
     val stocksPossessed = commonCompanies zip theirCompanies map reduceTuple
@@ -50,7 +53,8 @@ class InvestorsDataProcessor {
     println(investorsCategoriesMatrix)
     println(investorsAttributesSimilarityMatrix)
 
-    List(investorsStocksMatrix, investorsCategoriesMatrix, investorsAttributesSimilarityMatrix)
+    List(investorsStocksMatrix, investorsCategoriesMatrix)
+//    List(investorsStocksMatrix, investorsCategoriesMatrix, investorsAttributesSimilarityMatrix)
   }
 
   def collection2DToRealMatrix(nested: Iterable[Iterable[Double]]): Array2DRowRealMatrix = {
