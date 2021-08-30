@@ -1,7 +1,7 @@
 import data.DataExtractor
 import data.queries.{GetInvestorsQuery, GetTargetInvestorQuery}
 import investors.InvestorsDataProcessor
-import moveItToDataServer.DatabaseUpdater
+import updater.DatabaseUpdater
 import org.apache.commons.math3.linear.{Array2DRowRealMatrix, ArrayRealVector, EigenDecomposition, RealVector}
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.mllib.linalg

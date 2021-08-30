@@ -3,7 +3,7 @@ package recommendation
 import data.DataExtractor
 import data.queries.{GetInvestorsQuery, GetTargetInvestorQuery}
 import investors.InvestorsDataProcessor
-import org.apache.commons.math3.linear.Array2DRowRealMatrix
+import org.apache.commons.math3.linear.{Array2DRowRealMatrix, RealMatrix}
 
 import java.util
 import java.util.Properties
@@ -16,10 +16,9 @@ class Recommender(targetInvestor: Int) {
 
   def step(stockRecommendations: util.Map[String, Double]): List[(String, Double)] = {
     val stocksByInvestors = findStocksBaseOnSimilarity(50, targetInvestor)
-    val res = stocksByInvestors._1.map(x => (x._1, stockRecommendations.getOrDefault(x._1, 0.0) + x._2)).toList
-      .sorted(Ordering.by[(String, Double), Double](_._2).reverse)
 
-    return res
+    stocksByInvestors._1.map(x => (x._1, stockRecommendations.getOrDefault(x._1, 0.0) + x._2)).toList
+      .sorted(Ordering.by[(String, Double), Double](_._2).reverse)
   }
 
   def findStocksBaseOnSimilarity(investorsN: Int, baseInvestor: Int, evaluation: (Double, Double) = (0.0, 0.0)) = {
@@ -29,11 +28,19 @@ class Recommender(targetInvestor: Int) {
 
     val data = investorsDataProcessor.get(surroundingInvestors.limit(investorsN), targetInvestor) map collection2DToRealMatrix
 
-    val similarities = engine.getTopNEmbeddings(engine.createConsensusEmbedding(data), data)
+    val stocks = (matrix: RealMatrix) => {
+      val similarities = engine.getTopNEmbeddings(matrix, data)
+      val similarStocks = engine.getTopNStocks(similarities, surroundingInvestors.select(GetInvestorsQuery.theirCompaniesMap).take(investorsN), evaluation)
 
-    val similarStocks = engine.getTopNStocks(similarities, surroundingInvestors.select(GetInvestorsQuery.theirCompaniesMap).take(investorsN), evaluation)
+      (similarStocks._1.map(entry => (entry._1, normalize(entry._2))), similarStocks._2)
+    }
 
-    (similarStocks._1.map(entry => (entry._1, normalize(entry._2))), similarStocks._2)
+    engine.createConsensusEmbedding(data) match {
+      case Right(matrix) => stocks(matrix)
+      case Left(error) =>
+        println(error)
+        (Map[String, Double](), Map[String, Double]())
+    }
   }
 
   def collection2DToRealMatrix(nested: Iterable[Iterable[Double]]): Array2DRowRealMatrix = {

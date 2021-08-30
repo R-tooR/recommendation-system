@@ -4,7 +4,10 @@ import data.DataExtractor
 import data.queries.{GetInvestorsQuery, GetTargetInvestorQuery}
 import evaluation.queries.GetAllStocksFromUserInterestQuery
 import investors.InvestorsDataProcessor
-import moveItToDataServer.DatabaseUpdater
+import updater.DatabaseUpdater
+import org.apache.spark
+import org.apache.spark.SparkConf
+import org.apache.spark.sql.SparkSession
 import org.scalatest.Inspectors.{forAll, forEvery}
 import org.scalatest.matchers.should
 import org.scalatest.propspec.AnyPropSpec
@@ -12,6 +15,7 @@ import recommendation.Recommender
 
 import java.util.Properties
 import scala.collection.immutable.ListMap
+import scala.util.parsing.json
 
 class Evaluation  extends AnyPropSpec with should.Matchers {
 
@@ -43,6 +47,8 @@ class Evaluation  extends AnyPropSpec with should.Matchers {
     println("----- Top@10 -----")
     println("All precisions: " + precisions)
     println("All recalls: " + recalls)
+    precisions = precisions.filter(res => res != Double.NaN)
+    recalls = recalls.filter(res => res != Double.NaN)
     println("Average precisions: " + precisions.sum/precisions.size)
     println("Average recalls: " + recalls.sum/recalls.size)
 
@@ -52,7 +58,7 @@ class Evaluation  extends AnyPropSpec with should.Matchers {
     var precisions = Vector[Double]()
     var recalls = Vector[Double]()
     forAll(Seq((25, 0), (25, 1), (25, 2), (25, 3), (25, 4), (25, 5))) { input =>
-      val res = evaluation(input, relevancy = (0.5, 4.0))
+      val res = evaluation(input, relevancy = (0.45, 5.0))
       precisions = precisions :+ res._1
       recalls = recalls :+ res._2
     }
@@ -60,6 +66,8 @@ class Evaluation  extends AnyPropSpec with should.Matchers {
     println("----- Top@25 -----")
     println("All precisions: " + precisions)
     println("All recalls: " + recalls)
+    precisions = precisions.filter(res => res != Double.NaN)
+    recalls = recalls.filter(res => res != Double.NaN)
     println("Average precisions: " + precisions.sum/precisions.size)
     println("Average recalls: " + recalls.sum/recalls.size)
 
@@ -68,13 +76,15 @@ class Evaluation  extends AnyPropSpec with should.Matchers {
   property("Evaluation @25 update") {
     var precisions = Vector[Double]()
     var recalls = Vector[Double]()
-    forEvery(Seq((25, 0), (25, 1), (25, 2), (25, 3), (25, 4), (25, 5))) { input =>
-      val res = evaluation(input, runs = 3)
+    forAll(Seq((25, 0), (25, 1), (25, 2), (25, 3), (25, 4), (25, 5))) { input =>
+//    forEvery(Seq((25, 0), (25, 1), (25, 2), (25, 3), (25, 4), (25, 5))) { input =>
+      val res = evaluation(input, runs = 3, relevancy = (0.5, 4.0))
       precisions = precisions :+ res._1
       recalls = recalls :+ res._2
+//      Thread.sleep(100)
     }
 
-    println("----- Top@25 -----")
+    println("----- Top@25 update -----")
     println("All precisions: " + precisions)
     println("All recalls: " + recalls)
     println("Average precisions: " + precisions.sum/precisions.size)
@@ -177,6 +187,23 @@ class Evaluation  extends AnyPropSpec with should.Matchers {
     println("Recall@" + input._1 + " = " + (relevantAndRetrievedIntersectionSize.toDouble / relevantSize))
 
     ((relevantAndRetrievedIntersectionSize.toDouble / retrievedSize), (relevantAndRetrievedIntersectionSize.toDouble / relevantSize))
+  }
+
+
+  def evaluationFromFile(path1: String, path2: String, relevancy: (Double, Double) = (0.4, 6.0)) = {
+    val config: SparkConf = new SparkConf().setAppName("My App")
+      .setMaster("local")
+      .set("spark.logConf", "true")
+    val ses = SparkSession.builder().config(config).getOrCreate()
+    val embeddings = ses.read.json(path1)
+    val companiesData = ses.read.csv(path2)
+
+    println(embeddings)
+    println(companiesData)
+  }
+
+  property("test") {
+    evaluationFromFile("C:\\Users\\artur\\Desktop\\exportCorrect.csv", "C:\\Users\\artur\\Desktop\\deepwalk.json")
   }
 
 //  property("Evaluation 2") {

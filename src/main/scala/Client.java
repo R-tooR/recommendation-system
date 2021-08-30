@@ -1,6 +1,6 @@
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import moveItToDataServer.DatabaseUpdater;
+import updater.DatabaseUpdater;
 import recommendation.Recommender;
 
 import java.io.*;
