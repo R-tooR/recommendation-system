@@ -2,7 +2,7 @@ package recommendation
 
 import org.apache.commons.math3.linear.{Array2DRowRealMatrix, DiagonalMatrix, EigenDecomposition, RealMatrix}
 import org.apache.spark.sql.Row
-import utils.UtilFunctions.{collection2DToRealMatrix, euclides, joinColumns, normalizeArray, sech0_5, zip4}
+import utils.UtilFunctions.{addIfNotExist, collection2DToRealMatrix, euclides, joinColumns, normalizeArray, sech0_5, zip4}
 
 import scala.collection.mutable
 import scala.util.Try
@@ -26,6 +26,32 @@ class Engine {
     val matrixSize = Try.apply(dflist collectFirst isQuadraticMatrix getOrElse 0).get
     val consensusEmbedding = new Array2DRowRealMatrix(listSize * matrixSize, listSize * matrixSize)
 
+    if(dflist.nonEmpty && dflist.head.getRowDimension > 1) {
+      val diagonal = for (m <- dflist) yield new DiagonalMatrix(m.getData.map(row => row.sum))
+      val laplacian = for ((diag, df) <- diagonal zip dflist) yield df.subtract(diag).scalarMultiply(-1) //diag.subtract(df)
+      val intermediateEmbeddings = createMatrixOfIntermediateEmbeddings(dflist, diagonal, laplacian)
+      var i = 0
+      var j = 0
+      for (m1 <- intermediateEmbeddings) {
+        j = 0
+        for (m2 <- intermediateEmbeddings) {
+          consensusEmbedding.setSubMatrix(m2.multiply(m1.transpose()).getData, i * matrixSize, j * matrixSize)
+          j = j + 1
+        }
+        i = i + 1
+      }
+
+      previousDfList = dflist
+      previousDiagonal = diagonal
+      previousLaplacian = laplacian
+      consensusEmbeddingResult = calculateConsensusEmbedding(consensusEmbedding)._1
+
+      Right(consensusEmbeddingResult)
+    } else {
+      Left("Cannot create recommendation due to lack of neighbours.")
+    }
+  }
+
     def createMatrixOfIntermediateEmbeddings(dflist: List[RealMatrix], diagonal: List[DiagonalMatrix], laplacian: List[RealMatrix]) = {
 //      if (initialization) {
 
@@ -36,7 +62,6 @@ class Engine {
         }
 
         val intermediate = diagonal zip laplacian map(x => normalize(x._1, x._2)) map calculateConsensusEmbedding
-//        val intermediate = dflist map calculateConsensusEmbedding
         val intermediateEmbeddings = intermediate map (x => x._1)
         eigenValues = intermediate map (x => x._2)
         eigenVectors = intermediateEmbeddings
@@ -60,35 +85,13 @@ class Engine {
 //      }
     }
 
-    if(dflist.nonEmpty && dflist.head.getRowDimension > 1) {
-      val diagonal = for (m <- dflist) yield new DiagonalMatrix(m.getData.map(row => row.sum))
-      val laplacian = for ((diag, df) <- diagonal zip dflist) yield df.subtract(diag).scalarMultiply(-1) //diag.subtract(df)
-      val intermediateEmbeddings = createMatrixOfIntermediateEmbeddings(dflist, diagonal, laplacian)
-      var i = 0
-      var j = 0
-      for (m1 <- intermediateEmbeddings) { //było dflist
-        j = 0
-        for (m2 <- intermediateEmbeddings) {
-          consensusEmbedding.setSubMatrix(m2.multiply(m1.transpose()).getData, i * matrixSize, j * matrixSize)
-          j = j + 1
-        }
-        i = i + 1
-      }
-
-      previousDfList = dflist
-      previousDiagonal = diagonal
-      previousLaplacian = laplacian
-      consensusEmbeddingResult = calculateConsensusEmbedding(consensusEmbedding)._1
-
-      Right(consensusEmbeddingResult)
-    } else {
-      Left("Cannot create recommendation due to lack of neighbours.")
-    }
-  }
-
   def updateEigenValuesAndCorrespondingVectors(diagonalSubtract: List[RealMatrix], laplacianSubtract: List[RealMatrix], eigenValues: List[Array[Double]], eigenVectors: List[RealMatrix]) = {
 
     val correspondingValuesVectors = zip4(diagonalSubtract, laplacianSubtract, eigenValues, eigenVectors)
+
+    val updatedEigenValuesVectors = correspondingValuesVectors.map(x => update(x._1, x._2, x._3, x._4))
+    updatedEigenValuesVectors toList
+  }
 
     def update(diagonalSubtract: RealMatrix, laplacianSubtract: RealMatrix, values: Array[Double], vectors: RealMatrix): (Array[Double], RealMatrix) = {
       val vectorsMatrixNonNormalized = for(v <- Seq.range(0, vectors.getColumnDimension)) yield new Array2DRowRealMatrix(vectors.getColumn(v))
@@ -196,10 +199,6 @@ class Engine {
       (updatedValues.toArray, joinColumns(updatedVectors))
     }
 
-    val updatedEigenValuesVectors = correspondingValuesVectors.map(x => update(x._1, x._2, x._3, x._4))
-    updatedEigenValuesVectors toList
-  }
-
   def calculateConsensusEmbedding(consensusEmbedding: RealMatrix) = {
 
     val result = new EigenDecomposition(consensusEmbedding)
@@ -230,14 +229,6 @@ class Engine {
   def getTopNStocks(similarities: Seq[Double], theirCompanies: Iterable[Row], evaluation: (Double, Double) = (0.0, 0.0)) = { // , recommendedRelevantStocks: mutable.Map[String, Double] = mutable.Map[String, Double]()
     val recommendedStocks = mutable.Map[String, Double]()
     val recommendedStocksCount = mutable.Map[String, Int]()
-
-    def addIfNotExist(key: String, value: Double, recommendedStocks: mutable.Map[String, Double]) = {
-      if (recommendedStocks contains key) {
-        recommendedStocks(key) += value
-      } else {
-        recommendedStocks(key) = value
-      }
-    }
 
     theirCompanies zip similarities.tail foreach (x => {
       x._1.getList(0).forEach((cp: String) => addIfNotExist(cp, x._2, recommendedStocks))

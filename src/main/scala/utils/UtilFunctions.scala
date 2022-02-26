@@ -2,6 +2,8 @@ package utils
 
 import org.apache.commons.math3.linear.{Array2DRowRealMatrix, RealMatrix}
 
+import scala.collection.mutable
+
 object UtilFunctions {
 
   def jaccobi (s1: Iterable[Nothing], s2: Iterable[Nothing]) = s1.toSet.intersect(s2.toSet).size/s1.toSet.union(s2.toSet).size.toDouble
@@ -23,4 +25,13 @@ object UtilFunctions {
     val max = x.max
     x map (n => n/max)
   }
+
+  def addIfNotExist(key: String, value: Double, recommendedStocks: mutable.Map[String, Double]) = {
+    if (recommendedStocks contains key) {
+      recommendedStocks(key) += value
+    } else {
+      recommendedStocks(key) = value
+    }
+  }
+
 }
