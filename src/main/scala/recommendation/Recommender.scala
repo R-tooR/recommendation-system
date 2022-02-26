@@ -3,7 +3,8 @@ package recommendation
 import data.DataExtractor
 import data.queries.{GetInvestorsQuery, GetTargetInvestorQuery}
 import investors.InvestorsDataProcessor
-import org.apache.commons.math3.linear.{Array2DRowRealMatrix, RealMatrix}
+import org.apache.commons.math3.linear.RealMatrix
+import utils.UtilFunctions.collection2DToRealMatrix
 
 import java.util
 import java.util.Properties
@@ -43,9 +44,9 @@ class Recommender(targetInvestor: Int) {
     }
   }
 
-  def collection2DToRealMatrix(nested: Iterable[Iterable[Double]]): Array2DRowRealMatrix = {
-    val doubleArray = nested map(iter => iter.toArray) toArray
-
-    new Array2DRowRealMatrix(doubleArray)
-  }
+//  def collection2DToRealMatrix(nested: Iterable[Iterable[Double]]): Array2DRowRealMatrix = {
+//    val doubleArray = nested map(iter => iter.toArray) toArray
+//
+//    new Array2DRowRealMatrix(doubleArray)
+//  }
 }

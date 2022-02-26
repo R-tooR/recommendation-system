@@ -2,6 +2,7 @@ package recommendation
 
 import org.apache.commons.math3.linear.{Array2DRowRealMatrix, DiagonalMatrix, EigenDecomposition, RealMatrix}
 import org.apache.spark.sql.Row
+import utils.UtilFunctions.{collection2DToRealMatrix, euclides, joinColumns, normalizeArray, sech0_5, zip4}
 
 import scala.collection.mutable
 import scala.util.Try
@@ -69,7 +70,6 @@ class Engine {
         j = 0
         for (m2 <- intermediateEmbeddings) {
           consensusEmbedding.setSubMatrix(m2.multiply(m1.transpose()).getData, i * matrixSize, j * matrixSize)
-
           j = j + 1
         }
         i = i + 1
@@ -78,24 +78,15 @@ class Engine {
       previousDfList = dflist
       previousDiagonal = diagonal
       previousLaplacian = laplacian
-
-      //    println("--------------- CONSENSUS EMBEDING -----------------")
-      //    for (r <- consensusEmbedding.getData) {
-      //      r.foreach(x => print(x + " "))
-      //      println()
-      //    }
-      //    if (stateChanged)
       consensusEmbeddingResult = calculateConsensusEmbedding(consensusEmbedding)._1
 
       Right(consensusEmbeddingResult)
     } else {
-//      consensusEmbeddingResult
       Left("Cannot create recommendation due to lack of neighbours.")
     }
   }
 
   def updateEigenValuesAndCorrespondingVectors(diagonalSubtract: List[RealMatrix], laplacianSubtract: List[RealMatrix], eigenValues: List[Array[Double]], eigenVectors: List[RealMatrix]) = {
-    def zip4[T1, T2, T3, T4, T](t1: List[T1], t2: List[T2], t3: List[T3], t4: List[T4]) = List(t1, t2, t3, t4).min(Ordering.by[List[Any], Double](_.size)).indices.map(i => (t1(i), t2(i), t3(i), t4(i)))
 
     val correspondingValuesVectors = zip4(diagonalSubtract, laplacianSubtract, eigenValues, eigenVectors)
 
@@ -202,10 +193,7 @@ class Engine {
 //      println("Vectors difference : " + updVecs)
 //      println()
 
-      def joinColumns = (list: List[RealMatrix]) => new Array2DRowRealMatrix(list.map(col => col.getColumn(0)).toArray)
-
       (updatedValues.toArray, joinColumns(updatedVectors))
-//      (updatedValues.map(x => x.getEntry(0,0)).toArray, joinColumns(updatedVectors))
     }
 
     val updatedEigenValuesVectors = correspondingValuesVectors.map(x => update(x._1, x._2, x._3, x._4))
@@ -221,13 +209,6 @@ class Engine {
     (collection2DToRealMatrix(eigenVectors map (row => row.toArray.toIterable) toIterable), eigenValues)
   }
 
-  //todo: posprzątaj to potem
-  def collection2DToRealMatrix(nested: Iterable[Iterable[Double]]): Array2DRowRealMatrix = {
-    val doubleArray = nested map (iter => iter.toArray) toArray
-
-    new Array2DRowRealMatrix(doubleArray)
-  }
-
 
   def getTopNEmbeddings(embeddings: RealMatrix, dflist: List[RealMatrix]) = {
 
@@ -237,29 +218,10 @@ class Engine {
     val topNAttributes = embeddings.getRowDimension / 5 //przyciąć wszytskie do takiej długości, i porównać je
     val p0 = embeddings.getSubMatrix(0, numOfAttributes - 1, 0, size - 1).transpose() //column to : ile wartości
     val p1 = embeddings.getSubMatrix(0, numOfAttributes - 1, size, 2 * size - 1).transpose()
-//    val p2 = embeddings.getSubMatrix(0, numOfAttributes - 1, 2 * size, 3 * size - 1).transpose()
-    val sech0_5 = (x: Double) => 2 / (Math.exp(2 * x) + Math.exp(-2 * x))
-
-    val euclides = (x: Iterable[Double], y: Iterable[Double]) => math.sqrt(((for ((a, b) <- x zip y) yield (a - b) * (a - b)) sum))
-
-    def normalize(x: Array[Double]): Array[Double] = {
-      val max = x.max
-      x map (n => n/max)
-    }
-
-//    val finalEmbeddings = List(dflist(1).multiply(p2).subtract(dflist(2).multiply(p1)),
-//      dflist(2).multiply(p0).subtract(dflist(0).multiply(p2)),
-//      dflist(0).multiply(p1).subtract(dflist(1).multiply(p0)),
-//    )
 
     val finalEmbeddings = List(dflist(0).multiply(p0).add(dflist(1).multiply(p1)))
-
-//    val allSimilarities = finalEmbeddings map (_.getRow(0))
-//    val resultsPerEmbedding = allSimilarities map normalize
-
-    val allSimilarities = finalEmbeddings map (_.getData.map(row => normalize(row.take(topNAttributes).tail)))
+    val allSimilarities = finalEmbeddings map (_.getData.map(row => normalizeArray(row.take(topNAttributes).tail)))
     val resultsPerEmbedding = allSimilarities map (m => m.map(row => m.map(row2 => euclides(row, row2))).head)
-//    val joinedResult = resultsPerEmbedding.head.indices.toArray map (x => resultsPerEmbedding map (arr => sech0_5(arr(x) * arr(x))) sum) map math.sqrt
     val joinedResult = resultsPerEmbedding.head.indices.toArray map (x => resultsPerEmbedding map (arr => arr(x) * arr(x)) sum) map math.sqrt map sech0_5
 
     joinedResult
@@ -291,7 +253,6 @@ class Engine {
           theirCompanies.toVector(inv._2).getList(0).forEach((cp: String) => addIfNotExist(cp, 1.0, recommendedRelevantStocks))
         })
         println("Relevant stocks: " + recommendedRelevantStocks.filter(x => x._2 >= evaluation._2))
-//      return (recommendedStocks, recommendedRelevantStocks)
     }
 
     println("Similar count: " + recommendedStocksCount)
