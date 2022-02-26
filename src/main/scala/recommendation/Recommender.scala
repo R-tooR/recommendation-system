@@ -4,18 +4,26 @@ import data.DataExtractor
 import data.queries.{GetInvestorsQuery, GetTargetInvestorQuery}
 import investors.InvestorsDataProcessor
 import org.apache.commons.math3.linear.{Array2DRowRealMatrix, RealMatrix}
+import properties.PropertiesNames.{recommenderTopN}
 
 import java.util
 import java.util.Properties
+import scala.util.Try
 
-class Recommender(targetInvestor: Int) {
-  private val dataExtractor = new DataExtractor(new Properties)
+class Recommender(targetInvestor: Int, appConf: Properties = new Properties()) {
+  private val recommenderTopNDefault : Int = 50
+  private val dataExtractor = new DataExtractor(appConf)
   private val investorsDataProcessor = new InvestorsDataProcessor
   private val engine = new Engine
 
 
   def step(stockRecommendations: util.Map[String, Double]): List[(String, Double)] = {
-    val stocksByInvestors = findStocksBaseOnSimilarity(50, targetInvestor)
+    val topN = Try {
+      Integer.parseInt(appConf.getProperty(recommenderTopN))
+    }
+
+    //todo: mieszanie javy ze scalą powoduje błąd no such field exception - DEFEKT
+    val stocksByInvestors = findStocksBaseOnSimilarity(topN.getOrElse(recommenderTopNDefault), targetInvestor)
 
     stocksByInvestors._1.map(x => (x._1, stockRecommendations.getOrDefault(x._1, 0.0) + x._2)).toList
       .sorted(Ordering.by[(String, Double), Double](_._2).reverse)
