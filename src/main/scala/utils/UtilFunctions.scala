@@ -6,7 +6,7 @@ import scala.collection.mutable
 
 object UtilFunctions {
 
-  def jaccobi (s1: Iterable[Nothing], s2: Iterable[Nothing]) = s1.toSet.intersect(s2.toSet).size/s1.toSet.union(s2.toSet).size.toDouble
+  def jaccobi (s1: Iterable[Any], s2: Iterable[Any]) = s1.toSet.intersect(s2.toSet).size/s1.toSet.union(s2.toSet).size.toDouble
   def cosine (s1: Iterable[Double], s2: Iterable[Double]) = 2*(((for((a, b) <- s1 zip s2) yield a * b) sum) / (math.sqrt(s1 map(i => i*i) sum) + math.sqrt(s2 map(i => i*i) sum)))
   def sech0_5 (x: Double) = 2 / (Math.exp(2 * x) + Math.exp(-2 * x))
   def euclides (x: Iterable[Double], y: Iterable[Double]) = math.sqrt(((for ((a, b) <- x zip y) yield (a - b) * (a - b)) sum))
@@ -34,4 +34,14 @@ object UtilFunctions {
     }
   }
 
+  def parseToIterable[B >: String](obj: Any) = {
+    obj match {
+      case x: mutable.WrappedArray[B] => x.toIterable
+      case x: String => parse(x)
+    }
+  }
+
+  def parse(str: String) = {
+    str.replace("[","").split(",").toIterable
+  }
 }

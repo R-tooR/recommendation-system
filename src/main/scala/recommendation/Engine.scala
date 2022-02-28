@@ -2,219 +2,27 @@ package recommendation
 
 import org.apache.commons.math3.linear.{Array2DRowRealMatrix, DiagonalMatrix, EigenDecomposition, RealMatrix}
 import org.apache.spark.sql.Row
-import utils.UtilFunctions.{addIfNotExist, collection2DToRealMatrix, euclides, joinColumns, normalizeArray, sech0_5, zip4}
+import utils.UtilFunctions.{addIfNotExist, collection2DToRealMatrix, euclides, joinColumns, normalizeArray, parseToIterable, sech0_5, zip4}
 
 import scala.collection.mutable
 import scala.util.Try
 
 class Engine {
-  var previousDfList = List.empty[RealMatrix]
-  var previousDiagonal = List.empty[RealMatrix]
-  var previousLaplacian = List.empty[RealMatrix]
-  private var initialization = true
-  private var eigenValues: List[Array[Double]] = List.empty[Array[Double]]
-  private var eigenVectors: List[RealMatrix] = List.empty[RealMatrix]
-  private var consensusEmbeddingResult: RealMatrix = new Array2DRowRealMatrix()
+
   private var stateChanged: Boolean = true
+  val embeddingCalculator: EmbeddingCalculator = new EmbeddingCalculator
+//  val embeddingUpdater: EmbeddingUpdater = new EmbeddingUpdater
 
-  def createConsensusEmbedding(dflist: List[RealMatrix]): Either[String, RealMatrix] = {
-    val listSize = dflist.size
-    val isQuadraticMatrix: PartialFunction[RealMatrix, Int] = {
-      case x if x.getColumnDimension == x.getRowDimension => x.getRowDimension
-    }
-
-    val matrixSize = Try.apply(dflist collectFirst isQuadraticMatrix getOrElse 0).get
-    val consensusEmbedding = new Array2DRowRealMatrix(listSize * matrixSize, listSize * matrixSize)
-
-    if(dflist.nonEmpty && dflist.head.getRowDimension > 1) {
-      val diagonal = for (m <- dflist) yield new DiagonalMatrix(m.getData.map(row => row.sum))
-      val laplacian = for ((diag, df) <- diagonal zip dflist) yield df.subtract(diag).scalarMultiply(-1) //diag.subtract(df)
-      val intermediateEmbeddings = createMatrixOfIntermediateEmbeddings(dflist, diagonal, laplacian)
-      var i = 0
-      var j = 0
-      for (m1 <- intermediateEmbeddings) {
-        j = 0
-        for (m2 <- intermediateEmbeddings) {
-          consensusEmbedding.setSubMatrix(m2.multiply(m1.transpose()).getData, i * matrixSize, j * matrixSize)
-          j = j + 1
-        }
-        i = i + 1
-      }
-
-      previousDfList = dflist
-      previousDiagonal = diagonal
-      previousLaplacian = laplacian
-      consensusEmbeddingResult = calculateConsensusEmbedding(consensusEmbedding)._1
-
-      Right(consensusEmbeddingResult)
-    } else {
-      Left("Cannot create recommendation due to lack of neighbours.")
-    }
-  }
-
-    def createMatrixOfIntermediateEmbeddings(dflist: List[RealMatrix], diagonal: List[DiagonalMatrix], laplacian: List[RealMatrix]) = {
-//      if (initialization) {
-
-        def normalize(diagonal: DiagonalMatrix, laplacian: RealMatrix): RealMatrix = {
-          new Array2DRowRealMatrix(
-            laplacian.getData zip Seq.range(0, laplacian.getRowDimension) map (row => row._1.map(d => d/diagonal.getEntry(row._2, row._2)))
-          )
-        }
-
-        val intermediate = diagonal zip laplacian map(x => normalize(x._1, x._2)) map calculateConsensusEmbedding
-        val intermediateEmbeddings = intermediate map (x => x._1)
-        eigenValues = intermediate map (x => x._2)
-        eigenVectors = intermediateEmbeddings
-
-        initialization = false
-        intermediateEmbeddings
-//      } else {
-//        val result = updateEigenValuesAndCorrespondingVectors(
-//          for ((prev, curr) <- previousDiagonal zip diagonal) yield curr.subtract(prev),
-//          for ((prev, curr) <- previousLaplacian zip laplacian) yield curr.subtract(prev),
-//          eigenValues,
-//          eigenVectors
-//        )
-//
-//        stateChanged = eigenValues.zip(result map (x => x._1)) exists (x => (x._1 zip x._2 map (y => y._1 - y._2) sum) > 0.0001)
-//
-//        eigenValues = result map (x => x._1)
-//        eigenVectors = result map (x => x._2)
-//
-//        eigenVectors
-//      }
-    }
-
-  def updateEigenValuesAndCorrespondingVectors(diagonalSubtract: List[RealMatrix], laplacianSubtract: List[RealMatrix], eigenValues: List[Array[Double]], eigenVectors: List[RealMatrix]) = {
-
-    val correspondingValuesVectors = zip4(diagonalSubtract, laplacianSubtract, eigenValues, eigenVectors)
-
-    val updatedEigenValuesVectors = correspondingValuesVectors.map(x => update(x._1, x._2, x._3, x._4))
-    updatedEigenValuesVectors toList
-  }
-
-    def update(diagonalSubtract: RealMatrix, laplacianSubtract: RealMatrix, values: Array[Double], vectors: RealMatrix): (Array[Double], RealMatrix) = {
-      val vectorsMatrixNonNormalized = for(v <- Seq.range(0, vectors.getColumnDimension)) yield new Array2DRowRealMatrix(vectors.getColumn(v))
-      val vectorsMatrix = vectorsMatrixNonNormalized.map(vec => vec.scalarMultiply(1/vec.getNorm))
-      val multiplyWithV1V2 = (a1: RealMatrix, LD: RealMatrix, a2: RealMatrix) => a1.transpose().multiply(LD).multiply(a2)
-      val multiplyWithVVT = (a: RealMatrix, LD: RealMatrix) => multiplyWithV1V2(a, LD, a)
-      val eps = 0.000001
-
-//      println()
-//      println("Values before : " + values.mkString("Array(", ", ", ")"))
-//      println("Vectors before : " + vectors)
-//      println("Vectors max: " + vectors.getData.max(Ordering.by[Array[Double], Double](_.max)).mkString("Array(", ", ", ")"))
-//      println("Vectors min: " + vectors.getData.min(Ordering.by[Array[Double], Double](_.min)).mkString("Array(", ", ", ")"))
-//
-//      println()
-
-//      val updVals = values.indices.toList.map(i => multiplyWithVVT(vectorsMatrix(i), laplacianSubtract)
-//        .subtract(multiplyWithVVT(vectorsMatrix(i), diagonalSubtract).scalarMultiply(values(i))))
-
-      //omijamy pierwszą wartość własną, zawsze równą 0
-      val updatedValues = values.indices.toList.map(i => {
-//        println("(" + i + ") a L a: " +  multiplyWithVVT(vectorsMatrix(i), laplacianSubtract))
-//        println("(" + i + ") a D a: " + multiplyWithVVT(vectorsMatrix(i), diagonalSubtract))
-//        println("(" + i + ") lambda a D a: " + multiplyWithVVT(vectorsMatrix(i), diagonalSubtract).scalarMultiply(values(i)))
-//        println("(" + i + ") a L a - lambda a D a: " + multiplyWithVVT(vectorsMatrix(i), laplacianSubtract)
-//          .subtract(multiplyWithVVT(vectorsMatrix(i), diagonalSubtract).scalarMultiply(values(i))))
-        multiplyWithVVT(vectorsMatrix(i), laplacianSubtract)
-        .subtract(multiplyWithVVT(vectorsMatrix(i), diagonalSubtract).scalarMultiply(values(i))).scalarAdd(values(i))}) map (_.getEntry(0,0))
-
-      val uniqueEigenValuesIndexes = (updatedValues zip updatedValues.indices) filter(x => math.abs(x._1 - 1.0) > eps) map(_._2)
-//      println("Unique eigen values indexes: " + uniqueEigenValuesIndexes.mkString("Array(", ", ", ")"))
-
-//      for (v <- vectorsMatrix) {
-//        println(" Norm: " + v.getNorm)
-//      }
-      val updatedVectors = vectorsMatrix.indices.toList.map(i => vectorsMatrix(i).add(
-//      val updatedVectors = uniqueEigenValuesIndexes.map(i => vectorsMatrix(i).add(
-        vectorsMatrix(i)
-          .scalarMultiply(-0.5)
-          .scalarMultiply(multiplyWithVVT(vectorsMatrix(i), diagonalSubtract).getEntry(0, 0))
-          .add(
-            vectorsMatrix.indices.toList.filter(j => j != i).map(j =>
-//            uniqueEigenValuesIndexes.filter(j => j != i).map(j =>
-              {
-//                println("values(" + j + ")" + values(j))
-//                println("values(j)" + values(j))
-
-//                println("(updatedValues(" + i + ") - updatedValues(" + j + ")" + (updatedValues(i) - updatedValues(j)))
-//
-//                println("a_j " + vectorsMatrix(i))
-//                println("a_i " + vectorsMatrix(j))
-//                println("L_A " + laplacianSubtract)
-//                println("D_A " + diagonalSubtract)
-//
-//                println("a_j L_A a_i " + multiplyWithV1V2(vectorsMatrix(i), laplacianSubtract, vectorsMatrix(j)))
-//                println("a_j D_A a_i " + multiplyWithV1V2(vectorsMatrix(i), diagonalSubtract, vectorsMatrix(j)))
-
-                vectorsMatrix(j).multiply(multiplyWithV1V2(vectorsMatrix(j), laplacianSubtract, vectorsMatrix(i)) //było multiply
-                .subtract(multiplyWithV1V2(vectorsMatrix(i), diagonalSubtract, vectorsMatrix(j))
-//                  .scalarMultiply(values(i))).scalarMultiply(1 / (values(i) - values(j)))
-                  .scalarMultiply(values(i))).scalarMultiply(1 / (updatedValues(i) - updatedValues(j)))
-              )}).reduce((m1, m2) => m1.add(m2))
-          )
-        )
-      )
-
-//      val updVecs = vectorsMatrix.indices.toList.map(i =>
-//        vectorsMatrix(i)
-//          .scalarMultiply(-0.5)
-//          .scalarMultiply(multiplyWithVVT(vectorsMatrix(i), diagonalSubtract).getEntry(0, 0))
-//          .add(
-//            vectorsMatrix.indices.toList.filter(j => j != i).map(j =>
-//            {
-//              //                println("values(i)" + values(i))
-//              //                println("values(j)" + values(j))
-//              //
-//              //                println("a_j " + vectorsMatrix(i))
-//              //                println("a_i " + vectorsMatrix(j))
-//              //                println("L_A " + laplacianSubtract)
-//              //                println("D_A " + diagonalSubtract)
-//              //
-//              //                println("a_j L_A a_i " + multiplyWithV1V2(vectorsMatrix(i), laplacianSubtract, vectorsMatrix(j)))
-//              //                println("a_j D_A a_i " + multiplyWithV1V2(vectorsMatrix(i), diagonalSubtract, vectorsMatrix(j)))
-//
-//              vectorsMatrix(j).multiply(multiplyWithV1V2(vectorsMatrix(j), laplacianSubtract, vectorsMatrix(i)) //było multiply
-//                .subtract(multiplyWithV1V2(vectorsMatrix(i), diagonalSubtract, vectorsMatrix(j))
-//                  .scalarMultiply(values(i))).scalarMultiply(1 / (values(i) - values(j)))
-//              )}).reduce((m1, m2) => m1.add(m2))
-//          )
-//      )
-
-//      println()
-//      println("Values after : " + updatedValues.mkString("Array(", ", ", ")"))
-//      print("Vectors after : ")
-//      for(v <- updatedVectors) {
-//        println(v)
-//      }
-//      println()
-//
-//      println()
-//      println("Values difference : " + updVals.mkString("Array(", ", ", ")"))
-//      println("Vectors difference : " + updVecs)
-//      println()
-
-      (updatedValues.toArray, joinColumns(updatedVectors))
-    }
-
-  def calculateConsensusEmbedding(consensusEmbedding: RealMatrix) = {
-
-    val result = new EigenDecomposition(consensusEmbedding)
-    val eigenValues = result.getRealEigenvalues //filter (x => x > 0) //czy można wykluczyć ujemne?
-    val eigenVectors = Seq.range(0, eigenValues.length) map (x => result.getEigenvector(x))
-
-    (collection2DToRealMatrix(eigenVectors map (row => row.toArray.toIterable) toIterable), eigenValues)
+  def createConsensusEmbedding(data: List[Array2DRowRealMatrix]) = {
+    embeddingCalculator.createConsensusEmbedding(data)
   }
 
 
   def getTopNEmbeddings(embeddings: RealMatrix, dflist: List[RealMatrix]) = {
 
-
     val size = dflist.head.getColumnDimension
     val numOfAttributes = embeddings.getRowDimension
-    val topNAttributes = embeddings.getRowDimension / 5 //przyciąć wszytskie do takiej długości, i porównać je
+    val topNAttributes = embeddings.getRowDimension / 5 //przyciąć wszystkie do takiej długości, i porównać je
     val p0 = embeddings.getSubMatrix(0, numOfAttributes - 1, 0, size - 1).transpose() //column to : ile wartości
     val p1 = embeddings.getSubMatrix(0, numOfAttributes - 1, size, 2 * size - 1).transpose()
 
@@ -231,7 +39,7 @@ class Engine {
     val recommendedStocksCount = mutable.Map[String, Int]()
 
     theirCompanies zip similarities.tail foreach (x => {
-      x._1.getList(0).forEach((cp: String) => addIfNotExist(cp, x._2, recommendedStocks))
+      parseToIterable(x._1.get(0)).foreach(cp => addIfNotExist(cp, x._2, recommendedStocks))
     })
 //    println("Similar stocks: " + recommendedStocks)
 //7,0,"[181, 78, 57, 43, 72, 26, 141, 51, 180, 138, 36]","[5, 3, 12, 0]"
@@ -241,7 +49,7 @@ class Engine {
         .sorted(Ordering.by[(Double, Int), Double](_._1).reverse)
         .take((similarities.size.toDouble * evaluation._1).toInt)
         .foreach(inv => {
-          theirCompanies.toVector(inv._2).getList(0).forEach((cp: String) => addIfNotExist(cp, 1.0, recommendedRelevantStocks))
+          parseToIterable(theirCompanies.toVector(inv._2).get(0)).foreach(cp => addIfNotExist(cp, 1.0, recommendedRelevantStocks))
         })
         println("Relevant stocks: " + recommendedRelevantStocks.filter(x => x._2 >= evaluation._2))
     }

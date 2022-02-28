@@ -2,9 +2,10 @@ package investors
 
 import data.queries.{GetInvestorsQuery, GetTargetInvestorQuery}
 import org.apache.spark.sql
-import utils.UtilFunctions.{jaccobi, similarityMatrix}
+import utils.UtilFunctions.{jaccobi, parseToIterable, similarityMatrix}
 
 import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
+import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
 class InvestorsDataProcessor {
@@ -15,24 +16,28 @@ class InvestorsDataProcessor {
     List(investorsStocksMatrix, investorsCategoriesMatrix)
   }
 
-  def getInvestorStocks(df: sql.DataFrame, target: sql.DataFrame): Try[List[Set[Nothing]]] = Try {
+  def getInvestorStocks(df: sql.DataFrame, target: sql.DataFrame): Try[List[Set[String]]] = Try {
     val companiesList = df.select(GetInvestorsQuery.companiesNamesList).collectAsList()
     val theirCompaniesMap = df.select(GetInvestorsQuery.theirCompaniesMap).collectAsList()
     val targetCompaniesMap = target.select(GetTargetInvestorQuery.targetInvestorCompanies).collectAsList()
-    val allTheirCompanies = (theirCompaniesMap zip companiesList map (r => r._1.getList(0).toIterable ++ r._2.getList(0).toIterable))
-    val allTargetCompanies = (targetCompaniesMap map (r => r.getList(0).toIterable))
+    val allTheirCompanies = (theirCompaniesMap zip companiesList map (r => {
+      parseToIterable(r._1.get(0)) ++ parseToIterable(r._2.get(0))
+//      r._1.getList(0).toIterable ++ r._2.getList(0).toIterable
+    }))
+    val allTargetCompanies = (targetCompaniesMap map (r => parseToIterable(r.get(0)).toIterable))
     val allCompanies = allTargetCompanies ++ allTheirCompanies
     (allCompanies map (r => r.toSet)).toList
   }
 
-  def getInvestorCategories(df: sql.DataFrame, target: sql.DataFrame): Try[List[Set[Nothing]]] = Try {
+  def getInvestorCategories(df: sql.DataFrame, target: sql.DataFrame): Try[List[Set[String]]] = Try {
     val theirCategories = df.select(GetInvestorsQuery.allTheirCategories).collectAsList()
     val targetCategories = target.select(GetTargetInvestorQuery.targetInvestorCategories).collectAsList()
     val allCategories = targetCategories ++ theirCategories
-    (allCategories map (r => r.getList(0).toSet)).toList
+    (allCategories map (r => (parseToIterable(r.get(0)) ++ Seq()).toSet)).toList
+//    (allCategories map (r => r.getList(0).toSet)).toList
   }
 
-  def tryInAttempts(tryCode: Try[List[Set[Nothing]]], attempts: Int = 5): List[Set[Nothing]] = {
+  def tryInAttempts(tryCode: Try[List[Set[String]]], attempts: Int = 5): List[Set[String]] = {
     tryCode match {
       case Success(value) => value
       case Failure(exception) => {
