@@ -7,6 +7,7 @@ import java.io.*;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.HashMap;
+import java.util.Properties;
 
 public class Client {
 //    val extractor = new DataExtractor(new Properties())
@@ -22,11 +23,14 @@ public class Client {
 
 
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
+        ParametersResolver resolver = new ParametersResolver(args);
+        Properties appProperties = new Properties();
+        appProperties.load(new InputStreamReader(new FileInputStream(resolver.paramsMap().get(ParametersResolver.applicationConfig()).get())));
         String hostname = "127.0.0.1";
         int port = Integer.parseInt("6666");
         ObjectMapper mapper = new ObjectMapper();
-        Recommender recommender = new Recommender(0);
+        Recommender recommender = new Recommender(0, appProperties);
         DatabaseUpdater updater = new DatabaseUpdater(0.1);
         updater.initialize();
         TypeReference<HashMap<String, Object>> typeRef
