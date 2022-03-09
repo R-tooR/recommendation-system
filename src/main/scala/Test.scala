@@ -1,3 +1,8 @@
+import akka.actor.ActorSystem
+import akka.stream.ActorAttributes.Dispatcher
+import akka.stream.scaladsl.{Flow, Sink, Source, Tcp}
+import akka.stream.scaladsl.Tcp.{IncomingConnection, ServerBinding}
+import akka.util.ByteString
 import data.DataExtractor
 import data.queries.{GetInvestorsQuery, GetTargetInvestorQuery}
 import investors.InvestorsDataProcessor
@@ -13,12 +18,39 @@ import org.neo4j.driver.{AuthTokens, GraphDatabase}
 import recommendation.Recommender
 
 import java.util.Properties
+import scala.concurrent.{ExecutionContext, Future}
 
 object Test {
   // dokumentacja
   // https://spark.apache.org/docs/3.0.0/submitting-applications.html#master-urls
   // https://spark.apache.org/docs/3.0.0/rdd-programming-guide.html#overview
   def main(args: Array[String]): Unit = {
+    implicit val actorSystem: ActorSystem = ActorSystem()
+    implicit val ec: ExecutionContext = ExecutionContext.global
+//    val binding: Future[ServerBinding] =
+//      Tcp().bind("127.0.0.1", 8888).to(Sink.ignore).run()
+//
+//    binding.map { b =>
+//      b.unbind().onComplete {
+//        case _ => // ...
+//      }
+//    }
+
+    import akka.stream.scaladsl.Framing
+
+    val connections: Source[IncomingConnection, Future[ServerBinding]] =
+      Tcp().bind("127.0.0.1", 8888)
+    connections.runForeach { connection =>
+      println(s"New connection from: ${connection.remoteAddress}")
+
+      val echo = Flow[ByteString]
+        .via(Framing.delimiter(ByteString("\n"), maximumFrameLength = 256, allowTruncation = true))
+        .map(_.utf8String)
+        .map(_ + "!!!\n")
+        .map(ByteString(_))
+
+      connection.handleWith(echo)
+    }
 //    val extractor = new DataExtractor(new Properties())
 //
 //    val df = extractor.get(new GetInvestorsQuery(0))
@@ -31,21 +63,21 @@ object Test {
 //    val r = e.getTopNEmbeddings(e.calculateConsensusEmbedding(e.createConsensusEmbedding(data)), data)
 //    println("Results: " + r.mkString("Array(", ", ", ")"))
 
-    val rs = new Recommender(0)
-    val db = new DatabaseUpdater(0.1)
-    println("------ INIT ------")
-    db.initialize()
-    for( i <- 1 to 10) {
-      println("------ UPDATE " + i + " ------")
-      db.update()
-    }
-//    println("------ UPDATE 1 ------")
-//    db.update()
-//    println("------ UPDATE 2 ------")
-//    db.update()
-    db.close()
-
-    print("ddddd")
+//    val rs = new Recommender(0)
+//    val db = new DatabaseUpdater(0.1)
+//    println("------ INIT ------")
+//    db.initialize()
+//    for( i <- 1 to 10) {
+//      println("------ UPDATE " + i + " ------")
+//      db.update()
+//    }
+////    println("------ UPDATE 1 ------")
+////    db.update()
+////    println("------ UPDATE 2 ------")
+////    db.update()
+//    db.close()
+//
+//    print("ddddd")
 //    val list = Seq(
 //      Set("a", "b", "c"),
 //      Set("a", "b", "d"),

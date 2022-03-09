@@ -2,16 +2,25 @@ package recommendation
 
 import org.apache.commons.math3.linear.{Array2DRowRealMatrix, DiagonalMatrix, EigenDecomposition, RealMatrix}
 import org.apache.spark.sql.Row
+import properties.PropertiesNames
 import utils.UtilFunctions.{addIfNotExist, collection2DToRealMatrix, euclides, joinColumns, normalizeArray, parseToIterable, sech0_5, zip4}
 
+import java.util.Properties
 import scala.collection.mutable
 import scala.util.Try
 
-class Engine {
+class Engine(appProp: Properties = new Properties()) {
 
   private var stateChanged: Boolean = true
   val embeddingCalculator: EmbeddingCalculator = new EmbeddingCalculator
 //  val embeddingUpdater: EmbeddingUpdater = new EmbeddingUpdater
+  val topNEmbeddingsRatio: Double = appProp.getOrDefault(PropertiesNames.calculationTopNAttr, "0.2").asInstanceOf[String].toDouble
+//  val topNEmbeddingsRatio: Double = appProp.computeIfAbsent(PropertiesNames.calculationTopNAttr, (x: Any) => 0.2).asInstanceOf[Double]
+
+  {
+    if(topNEmbeddingsRatio < 0.0 && topNEmbeddingsRatio > 1.0)
+      throw new IllegalArgumentException("Ratio of embedding values taken to further calculations should be in range [0.0, 1.0].\n Check property " + PropertiesNames.calculationTopNAttr)
+  }
 
   def createConsensusEmbedding(data: List[Array2DRowRealMatrix]) = {
     embeddingCalculator.createConsensusEmbedding(data)
@@ -22,7 +31,7 @@ class Engine {
 
     val size = dflist.head.getColumnDimension
     val numOfAttributes = embeddings.getRowDimension
-    val topNAttributes = embeddings.getRowDimension / 5 //przyciąć wszystkie do takiej długości, i porównać je
+    val topNAttributes = (embeddings.getRowDimension * topNEmbeddingsRatio).toInt //przyciąć wszystkie do takiej długości, i porównać je
     val p0 = embeddings.getSubMatrix(0, numOfAttributes - 1, 0, size - 1).transpose() //column to : ile wartości
     val p1 = embeddings.getSubMatrix(0, numOfAttributes - 1, size, 2 * size - 1).transpose()
 

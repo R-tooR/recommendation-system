@@ -42,6 +42,6 @@ object UtilFunctions {
   }
 
   def parse(str: String) = {
-    str.replace("[","").split(",").toIterable
+    str.replace("[","").replace("]", "").split(",").toIterable
   }
 }

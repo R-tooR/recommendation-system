@@ -3,7 +3,6 @@ package recommendation
 import data.DataExtractor
 import data.queries.{GetInvestorsQuery, GetTargetInvestorQuery}
 import investors.InvestorsDataProcessor
-import org.apache.commons.math3.linear.{Array2DRowRealMatrix, RealMatrix}
 import properties.PropertiesNames.{recommenderTopN}
 import org.apache.commons.math3.linear.RealMatrix
 import utils.UtilFunctions.collection2DToRealMatrix
@@ -16,7 +15,7 @@ class Recommender(targetInvestor: Int, appConf: Properties = new Properties()) {
   private val recommenderTopNDefault : Int = 50
   private val dataExtractor = new DataExtractor(appConf)
   private val investorsDataProcessor = new InvestorsDataProcessor
-  private val engine = new Engine
+  private val engine = new Engine(appConf)
 
 
   def step(stockRecommendations: util.Map[String, Double]): List[(String, Double)] = {

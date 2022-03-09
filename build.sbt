@@ -23,3 +23,9 @@ libraryDependencies += "org.neo4j.driver" % "neo4j-java-driver" % "1.0.4"
 
 //log
 libraryDependencies += "org.apache.logging.log4j" %% "log4j-api-scala" % "11.0"
+
+val AkkaVersion = "2.6.18"
+//libraryDependencies += "com.typesafe.akka" %% "akka-stream-typed" % AkkaVersion
+libraryDependencies += "com.typesafe.akka" %% "akka-stream" % AkkaVersion
+libraryDependencies += "com.typesafe.akka" %% "akka-actor-typed" % AkkaVersion
+//libraryDependencies += "com.typesafe.akka" %% "akka-testkit" % AkkaVersion

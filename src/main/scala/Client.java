@@ -1,5 +1,6 @@
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import properties.PropertiesNames;
 import updater.DatabaseUpdater;
 import recommendation.Recommender;
 
@@ -28,11 +29,15 @@ public class Client {
         Properties appProperties = new Properties();
         appProperties.load(new InputStreamReader(new FileInputStream(resolver.paramsMap().get(ParametersResolver.applicationConfig()).get())));
         String hostname = "127.0.0.1";
-        int port = Integer.parseInt("6666");
+        int port = Integer.parseInt(appProperties.getProperty(PropertiesNames.appPort(), "6666"));
+        DatabaseUpdater updater = null;
         ObjectMapper mapper = new ObjectMapper();
-        Recommender recommender = new Recommender(0, appProperties);
-        DatabaseUpdater updater = new DatabaseUpdater(0.1);
-        updater.initialize();
+        Recommender recommender = new Recommender(Integer.parseInt((String)appProperties.computeIfAbsent(PropertiesNames.targetInvestor(), x -> 0)), appProperties);
+        boolean isUpdaterEnabled = Boolean.parseBoolean((String)appProperties.computeIfAbsent(PropertiesNames.updaterEnabled(), x -> false));
+        if(isUpdaterEnabled) {
+            updater = new DatabaseUpdater(Double.parseDouble((String)appProperties.computeIfAbsent(PropertiesNames.updaterChangeRatio(), x -> 0.1)));
+            updater.initialize();
+        }
         TypeReference<HashMap<String, Object>> typeRef
                 = new TypeReference<HashMap<String, Object>>() {};
         try (Socket socket = new Socket(hostname, port)) {
@@ -45,7 +50,7 @@ public class Client {
                 var x = recommender.step(mapper.readValue(time, typeRef));
 //                System.out.println(time);
                 System.out.println("Result is: " + x);
-                updater.update();
+                if (isUpdaterEnabled) updater.update();
             }
 
         } catch (UnknownHostException ex) {
