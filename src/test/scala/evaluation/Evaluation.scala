@@ -1,8 +1,10 @@
 package evaluation
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import data.DataExtractor
 import data.queries.{GetInvestorsQuery, GetTargetInvestorQuery}
 import evaluation.queries.GetAllStocksFromUserInterestQuery
+import evaluation.EvaluationCommons.evaluation
 import investors.InvestorsDataProcessor
 import updater.DatabaseUpdater
 import org.apache.spark
@@ -12,47 +14,16 @@ import org.scalatest.Inspectors.{forAll, forEvery}
 import org.scalatest.matchers.should
 import org.scalatest.propspec.AnyPropSpec
 import recommendation.Recommender
+import utils.UtilFunctions
 
+import java.io.File
+import java.util
 import java.util.Properties
+import scala.beans.BeanProperty
 import scala.collection.immutable.ListMap
 import scala.util.parsing.json
 
 class Evaluation  extends AnyPropSpec with should.Matchers {
-
-  property("Evaluation @10") {
-    var precisions = Vector[Double]()
-    var recalls = Vector[Double]()
-    forEvery(Seq((10, 0), (10, 1), (10, 2), (10, 3), (10, 4), (10, 5))) { input =>
-//      val extractor = new DataExtractor(new Properties())
-//      val commonStocks = extractor.get(new GetAllStocksFromUserInterestQuery(0))
-//        .collectAsList().get(0).getList(0).toArray.map(x => x.asInstanceOf[String])
-//      val recommender: Recommender = new Recommender
-//
-//      val resultsCommon = recommender.findStocksBaseOnSimilarity(50, input._2, (0.4, 6.0))
-//
-//      val sortedResCommon = ListMap(resultsCommon._1.toSeq.sortWith(_._2 > _._2): _*).take(input._1)
-//      println(sortedResCommon)
-//      println(resultsCommon._2)
-//      val relevantAndRetrievedIntersectionSize = sortedResCommon.keySet.intersect(resultsCommon._2.keySet).size
-//      val retrievedSize = resultsCommon._1.take(input._1).size
-//      val relevantSize = resultsCommon._2.take(input._1).size
-//
-//      println("Precision@" + input._1 + " = " + (relevantAndRetrievedIntersectionSize.toDouble / retrievedSize))
-//      println("Recall@" + input._1 + " = " + (relevantAndRetrievedIntersectionSize.toDouble / relevantSize))
-      val res = evaluation(input)
-      precisions = precisions :+ res._1
-      recalls = recalls :+ res._2
-    }
-
-    println("----- Top@10 -----")
-    println("All precisions: " + precisions)
-    println("All recalls: " + recalls)
-    precisions = precisions.filter(res => res != Double.NaN)
-    recalls = recalls.filter(res => res != Double.NaN)
-    println("Average precisions: " + precisions.sum/precisions.size)
-    println("Average recalls: " + recalls.sum/recalls.size)
-
-  }
 
   property("Evaluation @25 init") {
     var precisions = Vector[Double]()
@@ -77,11 +48,9 @@ class Evaluation  extends AnyPropSpec with should.Matchers {
     var precisions = Vector[Double]()
     var recalls = Vector[Double]()
     forAll(Seq((25, 0), (25, 1), (25, 2), (25, 3), (25, 4), (25, 5))) { input =>
-//    forEvery(Seq((25, 0), (25, 1), (25, 2), (25, 3), (25, 4), (25, 5))) { input =>
       val res = evaluation(input, runs = 3, relevancy = (0.5, 4.0))
       precisions = precisions :+ res._1
       recalls = recalls :+ res._2
-//      Thread.sleep(100)
     }
 
     println("----- Top@25 update -----")
@@ -160,35 +129,6 @@ class Evaluation  extends AnyPropSpec with should.Matchers {
 
   }
 
-  def evaluation(input: (Int, Int), relevancy: (Double, Double) = (0.4, 6.0), runs: Int = 1) = {
-    def run(runs: Int, recommender: Recommender, params: (Int, Int, (Double, Double))) = {
-      val db = new DatabaseUpdater(0.1)
-      db.initialize()
-      for (i <- 0 until runs) {
-        recommender.findStocksBaseOnSimilarity(params._1, params._2, params._3)
-        db.update()
-      }
-
-      recommender.findStocksBaseOnSimilarity(params._1, params._2, params._3)
-    }
-    val recommender: Recommender = new Recommender(0)
-
-    val resultsCommon = run(runs,recommender,(50, input._2, relevancy))
-//    val resultsCommon = recommender.findStocksBaseOnSimilarity(50, input._2, relevancy)
-
-    val sortedResCommon = ListMap(resultsCommon._1.toSeq.sortWith(_._2 > _._2): _*).take(input._1)
-    println(sortedResCommon)
-    println(resultsCommon._2)
-    val relevantAndRetrievedIntersectionSize = sortedResCommon.keySet.intersect(resultsCommon._2.keySet).size
-    val retrievedSize = resultsCommon._1.take(input._1).size
-    val relevantSize = resultsCommon._2.take(input._1).size
-
-    println("Precision@" + input._1 + " = " + (relevantAndRetrievedIntersectionSize.toDouble / retrievedSize))
-    println("Recall@" + input._1 + " = " + (relevantAndRetrievedIntersectionSize.toDouble / relevantSize))
-
-    ((relevantAndRetrievedIntersectionSize.toDouble / retrievedSize), (relevantAndRetrievedIntersectionSize.toDouble / relevantSize))
-  }
-
 
   def evaluationFromFile(path1: String, path2: String, relevancy: (Double, Double) = (0.4, 6.0)) = {
     val config: SparkConf = new SparkConf().setAppName("My App")
@@ -202,28 +142,4 @@ class Evaluation  extends AnyPropSpec with should.Matchers {
     println(companiesData)
   }
 
-  property("test") {
-    evaluationFromFile("C:\\Users\\artur\\Desktop\\exportCorrect.csv", "C:\\Users\\artur\\Desktop\\deepwalk.json")
-  }
-
-//  property("Evaluation 2") {
-//    forEvery(EvaluationCases.top10) { input =>
-////      val extractor = new DataExtractor(new Properties())
-//      //      val commonStocks = extractor.get(new GetAllStocksFromUserInterestQuery(input.targetInvId))
-//      //        .collectAsList().get(0).getList(0).toArray.map(x => x.asInstanceOf[String])
-//      val recommender: Recommender = new Recommender
-//
-//      val resultsCommon = recommender.findStocksBaseOnSimilarity(input.numberOfInv, input.relevantParams)
-//
-//      val sortedResCommon = ListMap(resultsCommon._1.toSeq.sortWith(_._2 > _._2): _*).take(input.topN)
-//      //      println(sortedResCommon)
-//      //      println(resultsCommon._2)
-//      val relevantAndRetrievedIntersectionSize = sortedResCommon.keySet.intersect(resultsCommon._2.keySet).size
-//      val retrievedSize = resultsCommon._1.take(input.topN).size
-//      val relevantSize = resultsCommon._2.take(input.topN).size
-//
-//      println("Precision@" + input.topN + " = " + (relevantAndRetrievedIntersectionSize.toDouble / retrievedSize))
-//      println("Recall@" + input.topN + " = " + (relevantAndRetrievedIntersectionSize.toDouble / relevantSize))
-//    }
-//  }
 }

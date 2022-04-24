@@ -3,8 +3,9 @@ package recommendation
 import data.DataExtractor
 import data.queries.{GetInvestorsQuery, GetTargetInvestorQuery}
 import investors.InvestorsDataProcessor
-import org.apache.commons.math3.linear.{Array2DRowRealMatrix, RealMatrix}
 import properties.PropertiesNames.{recommenderTopN}
+import org.apache.commons.math3.linear.RealMatrix
+import utils.UtilFunctions.collection2DToRealMatrix
 
 import java.util
 import java.util.Properties
@@ -14,7 +15,7 @@ class Recommender(targetInvestor: Int, appConf: Properties = new Properties()) {
   private val recommenderTopNDefault : Int = 50
   private val dataExtractor = new DataExtractor(appConf)
   private val investorsDataProcessor = new InvestorsDataProcessor
-  private val engine = new Engine
+  private val engine = new Engine(appConf)
 
 
   def step(stockRecommendations: util.Map[String, Double]): List[(String, Double)] = {
@@ -22,7 +23,6 @@ class Recommender(targetInvestor: Int, appConf: Properties = new Properties()) {
       Integer.parseInt(appConf.getProperty(recommenderTopN))
     }
 
-    //todo: mieszanie javy ze scalą powoduje błąd no such field exception - DEFEKT
     val stocksByInvestors = findStocksBaseOnSimilarity(topN.getOrElse(recommenderTopNDefault), targetInvestor)
 
     stocksByInvestors._1.map(x => (x._1, stockRecommendations.getOrDefault(x._1, 0.0) + x._2)).toList
@@ -51,9 +51,4 @@ class Recommender(targetInvestor: Int, appConf: Properties = new Properties()) {
     }
   }
 
-  def collection2DToRealMatrix(nested: Iterable[Iterable[Double]]): Array2DRowRealMatrix = {
-    val doubleArray = nested map(iter => iter.toArray) toArray
-
-    new Array2DRowRealMatrix(doubleArray)
-  }
 }

@@ -1,6 +1,4 @@
-package updater
-
-import updater.queries.UnwindQuery
+package updater.queries
 
 import scala.collection.GenTraversableOnce
 

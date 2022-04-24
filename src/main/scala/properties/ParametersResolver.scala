@@ -1,3 +1,5 @@
+package properties
+
 class ParametersResolver(params : Array[String]) {
 
 
@@ -21,7 +23,6 @@ class ParametersResolver(params : Array[String]) {
 
 }
 
-//todo: to zostanie w projekcie, ale klas\e mo\znaby nawet do osobnego modul\u (w przyszlości)
 object ParametersResolver {
   val applicationConfig : String = "appconfig"
 
