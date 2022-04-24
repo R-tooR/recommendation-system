@@ -48,11 +48,9 @@ class Evaluation  extends AnyPropSpec with should.Matchers {
     var precisions = Vector[Double]()
     var recalls = Vector[Double]()
     forAll(Seq((25, 0), (25, 1), (25, 2), (25, 3), (25, 4), (25, 5))) { input =>
-//    forEvery(Seq((25, 0), (25, 1), (25, 2), (25, 3), (25, 4), (25, 5))) { input =>
       val res = evaluation(input, runs = 3, relevancy = (0.5, 4.0))
       precisions = precisions :+ res._1
       recalls = recalls :+ res._2
-//      Thread.sleep(100)
     }
 
     println("----- Top@25 update -----")
@@ -132,8 +130,6 @@ class Evaluation  extends AnyPropSpec with should.Matchers {
   }
 
 
-
-
   def evaluationFromFile(path1: String, path2: String, relevancy: (Double, Double) = (0.4, 6.0)) = {
     val config: SparkConf = new SparkConf().setAppName("My App")
       .setMaster("local")
@@ -146,7 +142,4 @@ class Evaluation  extends AnyPropSpec with should.Matchers {
     println(companiesData)
   }
 
-  property("test") {
-    evaluationFromFile("C:\\Users\\artur\\Desktop\\exportCorrect.csv", "C:\\Users\\artur\\Desktop\\deepwalk.json")
-  }
 }

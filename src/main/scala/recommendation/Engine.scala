@@ -15,7 +15,6 @@ class Engine(appProp: Properties = new Properties()) {
   val embeddingCalculator: EmbeddingCalculator = new EmbeddingCalculator
 //  val embeddingUpdater: EmbeddingUpdater = new EmbeddingUpdater
   val topNEmbeddingsRatio: Double = appProp.getOrDefault(PropertiesNames.calculationTopNAttr, "0.2").asInstanceOf[String].toDouble
-//  val topNEmbeddingsRatio: Double = appProp.computeIfAbsent(PropertiesNames.calculationTopNAttr, (x: Any) => 0.2).asInstanceOf[Double]
 
   {
     if(topNEmbeddingsRatio < 0.0 && topNEmbeddingsRatio > 1.0)
@@ -50,8 +49,7 @@ class Engine(appProp: Properties = new Properties()) {
     theirCompanies zip similarities.tail foreach (x => {
       parseToIterable(x._1.get(0)).foreach(cp => addIfNotExist(cp, x._2, recommendedStocks))
     })
-//    println("Similar stocks: " + recommendedStocks)
-//7,0,"[181, 78, 57, 43, 72, 26, 141, 51, 180, 138, 36]","[5, 3, 12, 0]"
+
     val recommendedRelevantStocks = mutable.Map[String, Double]()
     if(evaluation._1 > 0.0 && evaluation._2 > 0.0) {
       (similarities.tail zip similarities.indices.toList)

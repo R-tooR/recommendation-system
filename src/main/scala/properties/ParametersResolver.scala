@@ -1,3 +1,5 @@
+package properties
+
 class ParametersResolver(params : Array[String]) {
 
 

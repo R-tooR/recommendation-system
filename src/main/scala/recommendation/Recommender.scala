@@ -23,7 +23,6 @@ class Recommender(targetInvestor: Int, appConf: Properties = new Properties()) {
       Integer.parseInt(appConf.getProperty(recommenderTopN))
     }
 
-    //todo: mieszanie javy ze scalą powoduje błąd no such field exception - DEFEKT
     val stocksByInvestors = findStocksBaseOnSimilarity(topN.getOrElse(recommenderTopNDefault), targetInvestor)
 
     stocksByInvestors._1.map(x => (x._1, stockRecommendations.getOrDefault(x._1, 0.0) + x._2)).toList
@@ -52,9 +51,4 @@ class Recommender(targetInvestor: Int, appConf: Properties = new Properties()) {
     }
   }
 
-//  def collection2DToRealMatrix(nested: Iterable[Iterable[Double]]): Array2DRowRealMatrix = {
-//    val doubleArray = nested map(iter => iter.toArray) toArray
-//
-//    new Array2DRowRealMatrix(doubleArray)
-//  }
 }

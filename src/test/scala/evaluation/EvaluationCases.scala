@@ -10,10 +10,10 @@ object EvaluationCases extends TableDrivenPropertyChecks {
     "top 10",
     EvaluationRecord(0, 25, 10, (0.4, 6.0)),
     EvaluationRecord(1, 25, 10, (0.4, 6.0)),
-//    EvaluationRecord(2, 25, 10, (0.4, 6.0)),
-//    EvaluationRecord(3, 25, 10, (0.4, 6.0)),
-//    EvaluationRecord(4, 25, 10, (0.4, 6.0)),
-//    EvaluationRecord(5, 25, 10, (0.4, 6.0)),
+    EvaluationRecord(2, 25, 10, (0.4, 6.0)),
+    EvaluationRecord(3, 25, 10, (0.4, 6.0)),
+    EvaluationRecord(4, 25, 10, (0.4, 6.0)),
+    EvaluationRecord(5, 25, 10, (0.4, 6.0)),
   )
 
   val top25 = Table(

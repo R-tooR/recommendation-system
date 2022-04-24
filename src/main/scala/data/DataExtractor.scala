@@ -6,7 +6,6 @@ import org.apache.spark.sql.{DataFrame, DataFrameReader, SparkSession}
 import properties.PropertiesNames.{appLogging, appMaster, appName, dbPassword, dbUrl, dbUsername}
 
 import java.util.Properties
-import scala.util.Try
 
 class DataExtractor(val props: Properties) {
   // http://spark.apache.org/docs/latest/configuration org.neo4j.html#configuring-logging
@@ -21,10 +20,7 @@ class DataExtractor(val props: Properties) {
     .option("url", props.getProperty(dbUrl, "bolt://localhost:7687"))
     .option("authentication.basic.username", props.getProperty(dbUsername, "neo4j"))
     .option("authentication.basic.password", props.getProperty(dbPassword, "inv"))
-//  val connection: DataFrameReader = spark.read.format("org.neo4j.spark.DataSource")
-//    .option("url", props.getProperty("url", "bolt://localhost:7687"))
-//    .option("authentication.basic.username", props.getProperty("username", "neo4j"))
-//    .option("authentication.basic.password", props.getProperty("password", "inv"))
+
 
   def get(query: Query): DataFrame = {
     connection

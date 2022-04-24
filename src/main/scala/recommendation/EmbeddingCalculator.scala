@@ -88,7 +88,7 @@ class EmbeddingCalculator {
   def calculateConsensusEmbedding(consensusEmbedding: RealMatrix) = {
 
     val result = new EigenDecomposition(consensusEmbedding)
-    val eigenValues = result.getRealEigenvalues //filter (x => x > 0) //czy można wykluczyć ujemne?
+    val eigenValues = result.getRealEigenvalues
     val eigenVectors = Seq.range(0, eigenValues.length) map (x => result.getEigenvector(x))
 
     (collection2DToRealMatrix(eigenVectors map (row => row.toArray.toIterable) toIterable), eigenValues)

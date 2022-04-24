@@ -5,7 +5,6 @@ import org.apache.spark.sql
 import utils.UtilFunctions.{jaccobi, parseToIterable, similarityMatrix}
 
 import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
-import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
 class InvestorsDataProcessor {
@@ -22,7 +21,6 @@ class InvestorsDataProcessor {
     val targetCompaniesMap = target.select(GetTargetInvestorQuery.targetInvestorCompanies).collectAsList()
     val allTheirCompanies = (theirCompaniesMap zip companiesList map (r => {
       parseToIterable(r._1.get(0)) ++ parseToIterable(r._2.get(0))
-//      r._1.getList(0).toIterable ++ r._2.getList(0).toIterable
     }))
     val allTargetCompanies = (targetCompaniesMap map (r => parseToIterable(r.get(0)).toIterable))
     val allCompanies = allTargetCompanies ++ allTheirCompanies
@@ -34,7 +32,6 @@ class InvestorsDataProcessor {
     val targetCategories = target.select(GetTargetInvestorQuery.targetInvestorCategories).collectAsList()
     val allCategories = targetCategories ++ theirCategories
     (allCategories map (r => (parseToIterable(r.get(0)) ++ Seq()).toSet)).toList
-//    (allCategories map (r => r.getList(0).toSet)).toList
   }
 
   def tryInAttempts(tryCode: Try[List[Set[String]]], attempts: Int = 5): List[Set[String]] = {

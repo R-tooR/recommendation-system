@@ -1,20 +1,23 @@
 package updater
 
 import data.DataExtractor
-import org.neo4j.driver.internal.logging.JULogging
 import org.neo4j.driver.{AuthTokens, Config, GraphDatabase, Logging}
-import updater.queries.{GetCategoriesStocksQuery, GetInvestorsIdCategoriesQuery}
+import properties.PropertiesNames.{dbPassword, dbUrl, dbUsername}
+import updater.queries.{ClearInvestorStock, GetCategoriesStocksQuery, GetInvestorsIdCategoriesQuery, SetInvestmentAmount, SetNewCompaniesForInvestors}
 
 import java.util.Properties
-import java.util.logging.Level
 
-class DatabaseUpdater(changeRatio: Double) {
+class DatabaseUpdater(changeRatio: Double, props: Properties) {
 
   assert(changeRatio > 0 && changeRatio <= 1)
   val log = Logging.none()
   val config = Config.builder().withLogging(Logging.none()).build()
-//  val config = Config.builder().withLogging(Logging.javaUtilLogging(Level.WARNING)).build()
-  val driver = GraphDatabase.driver("bolt://localhost:7687", AuthTokens.basic("neo4j", "inv"), config)
+  val driver = GraphDatabase.driver(
+    props.getProperty(dbUrl, "bolt://localhost:7687"),
+    AuthTokens.basic(
+      props.getProperty(dbUsername, "neo4j"),
+      props.getProperty(dbPassword, "inv")
+    ), config)
   val session = driver.session
   val extractor = new DataExtractor(new Properties())
   private var categoryStocksMap: Map[String, Seq[String]] = Map[String, Seq[String]]()
@@ -38,15 +41,12 @@ class DatabaseUpdater(changeRatio: Double) {
     session.run(new SetInvestmentAmount(invCompaniesAmount).get)
     println(new SetNewCompaniesForInvestors(invCompanies).get)
     session.run(new SetNewCompaniesForInvestors(invCompanies).get)
-//    extractor.get(new SetInvestmentAmount(invCompaniesAmount))
-//    extractor.get(new SetNewCompaniesForInvestors(invCompanies))
 
   }
 
   def close(): Unit = session.close()
 
   private def getRandomCompanies(invId: Long) = {
-//    val companiesAmount = companiesMin + math.random()*(companiesMax-companiesMin)
     def randomCompanies(companies: Seq[String], categoryAndAmount: (String, Int)) = {
       Seq.fill(categoryAndAmount._2)(companies.length-1).map(index => companies((index*math.random()).toInt))
     }
